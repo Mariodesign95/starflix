@@ -1456,7 +1456,7 @@ builder.defineStreamHandler(async ({ type, id, config = {} }) => {
                 rawStreamsCount = Array.isArray(streams) ? streams.length : 0;
 
                 // Fase 2.3: Stream Processing
-                const processedStreams = streams
+                const filteredStreams = streams
                     .filter((s) => {
                         if (!s || !s.url) return false;
                         const server = (s.server || "").toLowerCase();
@@ -1481,41 +1481,66 @@ builder.defineStreamHandler(async ({ type, id, config = {} }) => {
                             !sName.includes('uqload') &&
                             !sTitle.includes('uqload')
                         );
-                    })
-                    .map((s) => {
-                        let finalStreamUrl = s.url;
-                        let proxiedByEasyProxy = false;
-                        if (name === 'streamingcommunity') {
-                            finalStreamUrl = buildEasyProxyExtractorUrl(
-                                easyProxyUrl,
-                                easyProxyPassword,
-                                'vixsrc',
-                                s.easyProxySourceUrl || s.url
-                            );
-                            proxiedByEasyProxy = finalStreamUrl !== s.url;
-                        } else if (name === 'animeunity') {
-                            finalStreamUrl = buildEasyProxyManifestUrl(
-                                easyProxyUrl,
-                                easyProxyPassword,
-                                s.easyProxySourceUrl || s.url
-                            );
-                            proxiedByEasyProxy = finalStreamUrl !== s.url;
-                        } else if (isStreamHgStream(s)) {
-                            finalStreamUrl = buildEasyProxyExtractorUrl(
-                                easyProxyUrl,
-                                easyProxyPassword,
-                                'streamhg',
-                                s.easyProxySourceUrl || s.url
-                            );
-                            proxiedByEasyProxy = finalStreamUrl !== s.url;
-                        } else if (isMixdropStreamUrl(s.url)) {
-                            finalStreamUrl = buildEasyProxyStreamUrl(
-                                easyProxyUrl,
-                                easyProxyPassword,
-                                s.easyProxySourceUrl || s.url
-                            );
-                            proxiedByEasyProxy = finalStreamUrl !== s.url;
+                });
+
+                const processedStreams = await Promise.all(filteredStreams.map(async (s) => {
+                    let finalStreamUrl = s.url;
+                    let proxiedByEasyProxy = false;
+                    if (name === 'streamingcommunity') {
+                        const extractorUrl = buildEasyProxyExtractorUrl(
+                            easyProxyUrl,
+                            easyProxyPassword,
+                            'vixsrc',
+                            s.easyProxySourceUrl || s.url
+                        );
+                        try {
+                            const apiTargetUrl = extractorUrl.replace('&redirect_stream=true', '&redirect_stream=false');
+                            const res = await fetch(apiTargetUrl, { headers: { 'User-Agent': 'stremio-addon' } });
+                            if (res.ok) {
+                                const data = await res.json();
+                                finalStreamUrl = data.mediaflow_proxy_url || extractorUrl;
+                            } else {
+                                finalStreamUrl = extractorUrl;
+                            }
+                        } catch (e) {
+                            finalStreamUrl = extractorUrl;
                         }
+                        proxiedByEasyProxy = finalStreamUrl !== s.url;
+                    } else if (name === 'animeunity') {
+                        finalStreamUrl = buildEasyProxyManifestUrl(
+                            easyProxyUrl,
+                            easyProxyPassword,
+                            s.easyProxySourceUrl || s.url
+                        );
+                        proxiedByEasyProxy = finalStreamUrl !== s.url;
+                    } else if (isStreamHgStream(s)) {
+                        const extractorUrl = buildEasyProxyExtractorUrl(
+                            easyProxyUrl,
+                            easyProxyPassword,
+                            'streamhg',
+                            s.easyProxySourceUrl || s.url
+                        );
+                        try {
+                            const apiTargetUrl = extractorUrl.replace('&redirect_stream=true', '&redirect_stream=false');
+                            const res = await fetch(apiTargetUrl, { headers: { 'User-Agent': 'stremio-addon' } });
+                            if (res.ok) {
+                                const data = await res.json();
+                                finalStreamUrl = data.mediaflow_proxy_url || extractorUrl;
+                            } else {
+                                finalStreamUrl = extractorUrl;
+                            }
+                        } catch (e) {
+                            finalStreamUrl = extractorUrl;
+                        }
+                        proxiedByEasyProxy = finalStreamUrl !== s.url;
+                    } else if (isMixdropStreamUrl(s.url)) {
+                        finalStreamUrl = buildEasyProxyStreamUrl(
+                            easyProxyUrl,
+                            easyProxyPassword,
+                            s.easyProxySourceUrl || s.url
+                        );
+                        proxiedByEasyProxy = finalStreamUrl !== s.url;
+                    }
 
                         // For Stremio, we reconstruct the legacy multiline format using metadata
                         const nameUI = (s.qualityTag && s.qualityTag !== 'Unknown') ? s.qualityTag : s.providerName;
@@ -1547,7 +1572,7 @@ builder.defineStreamHandler(async ({ type, id, config = {} }) => {
                             headers: proxiedByEasyProxy ? undefined : (s.headers || s.behaviorHints?.headers || s.behaviorHints?.proxyHeaders?.request),
                             language: s.language
                         };
-                    });
+                    }));
                 processedStreamsCount = processedStreams.length;
 
                 if (processedStreams.length > 0) {
