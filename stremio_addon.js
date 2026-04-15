@@ -1494,14 +1494,18 @@ builder.defineStreamHandler(async ({ type, id, config = {} }) => {
                             s.easyProxySourceUrl || s.url
                         );
                         try {
-                            const apiTargetUrl = extractorUrl.replace('&redirect_stream=true', '&redirect_stream=false');
-                            const res = await fetch(apiTargetUrl, { headers: { 'User-Agent': 'stremio-addon' } });
-                            if (res.ok) {
-                                const data = await res.json();
-                                finalStreamUrl = data.mediaflow_proxy_url || extractorUrl;
-                            } else {
-                                finalStreamUrl = extractorUrl;
+                            // Automatically follows 302 redirect correctly!
+                            const res = await fetch(extractorUrl, { method: 'HEAD', redirect: 'follow' });
+                            const targetStr = res.url || extractorUrl;
+                            
+                            // Fix the notoriously unencoded "d=" parameter causing 'Video not supported' on ExoPlayer
+                            const u = new URL(targetStr);
+                            const dValue = u.searchParams.get('d');
+                            if (dValue) {
+                                // Re-setting it will force the URL class to URLEncode it properly:
+                                u.searchParams.set('d', dValue);
                             }
+                            finalStreamUrl = u.toString();
                         } catch (e) {
                             finalStreamUrl = extractorUrl;
                         }
@@ -1521,14 +1525,14 @@ builder.defineStreamHandler(async ({ type, id, config = {} }) => {
                             s.easyProxySourceUrl || s.url
                         );
                         try {
-                            const apiTargetUrl = extractorUrl.replace('&redirect_stream=true', '&redirect_stream=false');
-                            const res = await fetch(apiTargetUrl, { headers: { 'User-Agent': 'stremio-addon' } });
-                            if (res.ok) {
-                                const data = await res.json();
-                                finalStreamUrl = data.mediaflow_proxy_url || extractorUrl;
-                            } else {
-                                finalStreamUrl = extractorUrl;
+                            const res = await fetch(extractorUrl, { method: 'HEAD', redirect: 'follow' });
+                            const targetStr = res.url || extractorUrl;
+                            const u = new URL(targetStr);
+                            const dValue = u.searchParams.get('d');
+                            if (dValue) {
+                                u.searchParams.set('d', dValue);
                             }
+                            finalStreamUrl = u.toString();
                         } catch (e) {
                             finalStreamUrl = extractorUrl;
                         }
