@@ -1486,9 +1486,10 @@ builder.defineStreamHandler(async ({ type, id, config = {} }) => {
                         let finalStreamUrl = s.url;
                         let proxiedByEasyProxy = false;
                         if (name === 'streamingcommunity') {
-                            finalStreamUrl = buildEasyProxyManifestUrl(
+                            finalStreamUrl = buildEasyProxyExtractorUrl(
                                 easyProxyUrl,
                                 easyProxyPassword,
+                                'vixsrc',
                                 s.easyProxySourceUrl || s.url
                             );
                             proxiedByEasyProxy = finalStreamUrl !== s.url;
